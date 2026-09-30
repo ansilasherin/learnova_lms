@@ -85,6 +85,21 @@ const courseSchema = new mongoose.Schema(
             required: [true, 'Category is required'],
             trim: true
         },
+        department: {
+            type: String,
+            trim: true,
+            default: 'Computer Science & Engineering'
+        },
+        semester: {
+            type: String,
+            trim: true,
+            default: 'Semester 1'
+        },
+        batch: {
+            type: String,
+            trim: true,
+            default: '2024 - 2028'
+        },
         price: {
             type: Number,
             required: [true, 'Price is required'],

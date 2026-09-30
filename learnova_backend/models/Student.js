@@ -20,15 +20,30 @@ const studentSchema = new mongoose.Schema(
             trim: true,
             default: ''
         },
+        department: {
+            type: String,
+            trim: true,
+            default: 'Computer Science & Engineering'
+        },
+        semester: {
+            type: String,
+            trim: true,
+            default: 'Semester 1'
+        },
         batch: {
             type: String,
             trim: true,
-            default: 'Batch A'
+            default: '2024 - 2028'
         },
         gender: {
             type: String,
             enum: ['Male', 'Female', 'Other'],
             default: 'Male'
+        },
+        user: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User',
+            default: null
         },
         addedBy: {
             type: mongoose.Schema.Types.ObjectId,

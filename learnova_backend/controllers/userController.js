@@ -7,7 +7,6 @@ const User = require('../models/User');
 // ====================================================
 const getUserProfile = async (req, res) => {
     try {
-        // req.user._id is extracted securely from the verified JWT token
         const user = await User.findById(req.user._id).select('-password');
 
         if (!user) {
@@ -39,7 +38,6 @@ const getUserProfile = async (req, res) => {
 // ====================================================
 const updateUserProfile = async (req, res) => {
     try {
-        // Fetch current user from DB
         const user = await User.findById(req.user._id);
 
         if (!user) {
@@ -50,17 +48,16 @@ const updateUserProfile = async (req, res) => {
         }
 
         // Update allowable fields if provided
-        if (req.body.name) {
-            user.name = req.body.name.trim();
-        }
-
-        if (req.body.phone !== undefined) {
-            user.phone = req.body.phone.trim();
-        }
-
-        if (req.body.profileImage) {
-            user.profileImage = req.body.profileImage.trim();
-        }
+        if (req.body.name) user.name = req.body.name.trim();
+        if (req.body.phone !== undefined) user.phone = req.body.phone.trim();
+        if (req.body.department) user.department = req.body.department.trim();
+        if (req.body.studentId !== undefined) user.studentId = req.body.studentId;
+        if (req.body.semester) user.semester = req.body.semester.trim();
+        if (req.body.batch) user.batch = req.body.batch.trim();
+        if (req.body.designation) user.designation = req.body.designation.trim();
+        if (req.body.facultyId !== undefined) user.facultyId = req.body.facultyId;
+        if (req.body.bio !== undefined) user.bio = req.body.bio.trim();
+        if (req.body.profileImage) user.profileImage = req.body.profileImage.trim();
 
         // Save updated user (Runs Mongoose schema validations)
         const updatedUser = await user.save();
@@ -74,7 +71,13 @@ const updateUserProfile = async (req, res) => {
                 email: updatedUser.email,
                 phone: updatedUser.phone,
                 role: updatedUser.role,
+                department: updatedUser.department,
                 studentId: updatedUser.studentId,
+                semester: updatedUser.semester,
+                batch: updatedUser.batch,
+                designation: updatedUser.designation,
+                facultyId: updatedUser.facultyId,
+                bio: updatedUser.bio,
                 profileImage: updatedUser.profileImage,
                 updatedAt: updatedUser.updatedAt
             }

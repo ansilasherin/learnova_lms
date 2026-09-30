@@ -32,7 +32,7 @@ const userSchema = new mongoose.Schema(
             type: String,
             required: [true, 'Please provide a password'],
             minlength: [6, 'Password must be at least 6 characters long'],
-            select: false // Queries-il (e.g. User.find()) password return aakaruthu (Security protection)
+            select: false // Exclude from find queries by default
         },
         role: {
             type: String,
@@ -42,10 +42,42 @@ const userSchema = new mongoose.Schema(
             },
             default: 'student'
         },
+        department: {
+            type: String,
+            trim: true,
+            default: 'Computer Science & Engineering'
+        },
+        // Student specific fields
         studentId: {
             type: String,
             trim: true,
             default: null
+        },
+        semester: {
+            type: String,
+            trim: true,
+            default: 'Semester 1'
+        },
+        batch: {
+            type: String,
+            trim: true,
+            default: '2024 - 2028'
+        },
+        // Teacher / Faculty specific fields
+        designation: {
+            type: String,
+            trim: true,
+            default: 'Assistant Professor'
+        },
+        facultyId: {
+            type: String,
+            trim: true,
+            default: null
+        },
+        bio: {
+            type: String,
+            trim: true,
+            default: ''
         },
         profileImage: {
             type: String,
@@ -62,12 +94,10 @@ const userSchema = new mongoose.Schema(
 // Mongoose Pre-save Hook: Password Auto-Hashing
 // ----------------------------------------------------
 userSchema.pre('save', async function (next) {
-    // Password modify cheythal mathram hash cheythaal mathi
     if (!this.isModified('password')) {
         return next();
     }
 
-    // Salt generate cheythu password hash cheyyunnu
     const salt = await bcrypt.genSalt(10);
     this.password = await bcrypt.hash(this.password, salt);
 });

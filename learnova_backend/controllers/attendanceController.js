@@ -1,49 +1,59 @@
 const Attendance = require('../models/Attendance');
 const Student = require('../models/Student');
 
-// Default initial class roster to pre-populate if database is clean
+// Default initial class roster to pre-populate for CS department if database is clean
 const DEFAULT_STUDENTS = [
-    { rollNo: '01', name: 'Aaditya Menon', batch: 'Batch A', email: 'aaditya.menon@gmail.com', gender: 'Male' },
-    { rollNo: '02', name: 'Ananya Sharma', batch: 'Batch A', email: 'ananya.sharma@gmail.com', gender: 'Female' },
-    { rollNo: '03', name: 'Arjun Das', batch: 'Batch A', email: 'arjun.das@gmail.com', gender: 'Male' },
-    { rollNo: '04', name: 'Devika Nair', batch: 'Batch A', email: 'devika.nair@gmail.com', gender: 'Female' },
-    { rollNo: '05', name: 'Fahad Mohammed', batch: 'Batch A', email: 'fahad.m@gmail.com', gender: 'Male' },
-    { rollNo: '06', name: 'Gautham Varma', batch: 'Batch A', email: 'gautham.v@gmail.com', gender: 'Male' },
-    { rollNo: '07', name: 'Meera Nambiar', batch: 'Batch A', email: 'meera.n@gmail.com', gender: 'Female' },
-    { rollNo: '08', name: 'Naveen Kumar', batch: 'Batch A', email: 'naveen.k@gmail.com', gender: 'Male' },
-    { rollNo: '09', name: 'Pooja Hegde', batch: 'Batch A', email: 'pooja.h@gmail.com', gender: 'Female' },
-    { rollNo: '10', name: 'Rahul Krishna', batch: 'Batch A', email: 'rahul.k@gmail.com', gender: 'Male' },
-    { rollNo: '11', name: 'Rohan Joshi', batch: 'Batch A', email: 'rohan.j@gmail.com', gender: 'Male' },
-    { rollNo: '12', name: 'Sneha Pillai', batch: 'Batch A', email: 'sneha.pillai@gmail.com', gender: 'Female' },
+    { rollNo: '01', name: 'Aaditya Menon', batch: 'Batch A', email: 'aaditya.menon@gmail.com', department: 'Computer Science & Engineering', gender: 'Male' },
+    { rollNo: '02', name: 'Ananya Sharma', batch: 'Batch A', email: 'ananya.sharma@gmail.com', department: 'Computer Science & Engineering', gender: 'Female' },
+    { rollNo: '03', name: 'Arjun Das', batch: 'Batch A', email: 'arjun.das@gmail.com', department: 'Computer Science & Engineering', gender: 'Male' },
+    { rollNo: '04', name: 'Devika Nair', batch: 'Batch A', email: 'devika.nair@gmail.com', department: 'Computer Science & Engineering', gender: 'Female' },
+    { rollNo: '05', name: 'Fahad Mohammed', batch: 'Batch A', email: 'fahad.m@gmail.com', department: 'Computer Science & Engineering', gender: 'Male' },
+    { rollNo: '06', name: 'Gautham Varma', batch: 'Batch A', email: 'gautham.v@gmail.com', department: 'Computer Science & Engineering', gender: 'Male' },
+    { rollNo: '07', name: 'Meera Nambiar', batch: 'Batch A', email: 'meera.n@gmail.com', department: 'Computer Science & Engineering', gender: 'Female' },
+    { rollNo: '08', name: 'Naveen Kumar', batch: 'Batch A', email: 'naveen.k@gmail.com', department: 'Computer Science & Engineering', gender: 'Male' },
+    { rollNo: '09', name: 'Pooja Hegde', batch: 'Batch A', email: 'pooja.h@gmail.com', department: 'Computer Science & Engineering', gender: 'Female' },
+    { rollNo: '10', name: 'Rahul Krishna', batch: 'Batch A', email: 'rahul.k@gmail.com', department: 'Computer Science & Engineering', gender: 'Male' },
+    { rollNo: '11', name: 'Rohan Joshi', batch: 'Batch A', email: 'rohan.j@gmail.com', department: 'Computer Science & Engineering', gender: 'Male' },
+    { rollNo: '12', name: 'Sneha Pillai', batch: 'Batch A', email: 'sneha.pillai@gmail.com', department: 'Computer Science & Engineering', gender: 'Female' },
 ];
 
-// Helper to seed students if none exist
-async function ensureStudentsExist() {
-    const count = await Student.countDocuments();
-    if (count === 0) {
-        await Student.insertMany(DEFAULT_STUDENTS);
-        console.log('📋 Auto-seeded 12 initial students into Class Roster');
+// Helper to seed students if none exist for CS department
+async function ensureStudentsExist(dept) {
+    if (dept === 'Computer Science & Engineering') {
+        const count = await Student.countDocuments({ department: 'Computer Science & Engineering' });
+        if (count === 0) {
+            await Student.insertMany(DEFAULT_STUDENTS);
+            console.log('📋 Auto-seeded 12 initial students into CS Class Roster');
+        }
     }
 }
 
 // ----------------------------------------------------
-// @desc    Get all students in class roster
+// @desc    Get all students in class roster (Department-aware)
 // @route   GET /api/attendance/roster
 // @access  Private
 // ----------------------------------------------------
 exports.getRoster = async (req, res) => {
     try {
-        await ensureStudentsExist();
-        const students = await Student.find().sort({ rollNo: 1, name: 1 });
+        const userDept = req.user?.department || 'Computer Science & Engineering';
+        await ensureStudentsExist(userDept);
+
+        const filter = {
+            department: userDept
+        };
+
+        const students = await Student.find(filter).sort({ rollNo: 1, name: 1 });
 
         res.status(200).json({
             success: true,
             count: students.length,
+            department: userDept,
             students: students.map((s) => ({
                 id: s._id,
                 rollNo: s.rollNo,
                 name: s.name,
                 email: s.email,
+                department: s.department || userDept,
                 batch: s.batch,
                 gender: s.gender,
                 createdAt: s.createdAt
@@ -65,7 +75,7 @@ exports.getRoster = async (req, res) => {
 // ----------------------------------------------------
 exports.addStudent = async (req, res) => {
     try {
-        const { name, rollNo, email, batch, gender } = req.body;
+        const { name, rollNo, email, department, batch, gender } = req.body;
 
         if (!name || name.trim() === '') {
             return res.status(400).json({
@@ -74,10 +84,12 @@ exports.addStudent = async (req, res) => {
             });
         }
 
+        const userDept = department || req.user?.department || 'Computer Science & Engineering';
+
         // Auto generate roll number if not provided
         let finalRollNo = rollNo ? rollNo.trim() : '';
         if (!finalRollNo) {
-            const count = await Student.countDocuments();
+            const count = await Student.countDocuments({ department: userDept });
             finalRollNo = String(count + 1).padStart(2, '0');
         }
 
@@ -85,6 +97,7 @@ exports.addStudent = async (req, res) => {
             name: name.trim(),
             rollNo: finalRollNo,
             email: email ? email.trim() : '',
+            department: userDept,
             batch: batch ? batch.trim() : 'Batch A',
             gender: gender || 'Male',
             addedBy: req.user ? req.user._id : null
@@ -98,6 +111,7 @@ exports.addStudent = async (req, res) => {
                 rollNo: newStudent.rollNo,
                 name: newStudent.name,
                 email: newStudent.email,
+                department: newStudent.department,
                 batch: newStudent.batch,
                 gender: newStudent.gender
             }
@@ -105,7 +119,7 @@ exports.addStudent = async (req, res) => {
     } catch (error) {
         res.status(500).json({
             success: false,
-            message: 'Error adding student',
+            message: 'Error adding student to register',
             error: error.message
         });
     }
@@ -118,22 +132,20 @@ exports.addStudent = async (req, res) => {
 // ----------------------------------------------------
 exports.deleteStudent = async (req, res) => {
     try {
-        const { id } = req.params;
-        const deleted = await Student.findByIdAndDelete(id);
+        const student = await Student.findById(req.params.id);
 
-        if (!deleted) {
+        if (!student) {
             return res.status(404).json({
                 success: false,
-                message: 'Student not found in register'
+                message: 'Student not found'
             });
         }
 
-        // Also remove past attendance records for this student
-        await Attendance.deleteMany({ student: id });
+        await Student.findByIdAndDelete(req.params.id);
 
         res.status(200).json({
             success: true,
-            message: `${deleted.name} removed from register.`
+            message: `${student.name} removed from roster`
         });
     } catch (error) {
         res.status(500).json({
@@ -145,16 +157,21 @@ exports.deleteStudent = async (req, res) => {
 };
 
 // ----------------------------------------------------
-// @desc    Get complete attendance sheet for given date & subject
+// @desc    Get complete attendance sheet for given date & subject (Department-aware)
 // @route   GET /api/attendance/sheet
 // @access  Private
 // ----------------------------------------------------
 exports.getClassAttendanceSheet = async (req, res) => {
     try {
-        await ensureStudentsExist();
+        const userDept = req.user?.department || 'Computer Science & Engineering';
+        await ensureStudentsExist(userDept);
         const { date, subject } = req.query;
 
-        const students = await Student.find().sort({ rollNo: 1, name: 1 });
+        const filter = {
+            department: userDept
+        };
+
+        const students = await Student.find(filter).sort({ rollNo: 1, name: 1 });
 
         // Map existing attendance records for the date and subject
         let existingMap = {};
@@ -197,6 +214,7 @@ exports.getClassAttendanceSheet = async (req, res) => {
                 rollNo: s.rollNo,
                 name: s.name,
                 email: s.email,
+                department: s.department || userDept,
                 batch: s.batch,
                 status: status, // 'present', 'absent', or 'unmarked'
                 isPresent: status === 'present'
@@ -208,6 +226,7 @@ exports.getClassAttendanceSheet = async (req, res) => {
             isRecorded,
             date: date || '',
             subject: subject || '',
+            department: userDept,
             count: sheet.length,
             sheet
         });
@@ -221,58 +240,49 @@ exports.getClassAttendanceSheet = async (req, res) => {
 };
 
 // ----------------------------------------------------
-// @desc    Save/Update Attendance Sheet for date & subject
+// @desc    Save/Submit complete class attendance sheet for a date
 // @route   POST /api/attendance/sheet
 // @access  Private (Teacher, Admin)
 // ----------------------------------------------------
 exports.saveClassAttendanceSheet = async (req, res) => {
     try {
-        const { subject, date, records } = req.body;
+        const { date, subject, department, records } = req.body;
 
-        if (!subject || !date || !Array.isArray(records)) {
+        if (!date || !subject || !Array.isArray(records)) {
             return res.status(400).json({
                 success: false,
-                message: 'Subject, date, and records list are required'
+                message: 'date, subject, and records array are required'
             });
         }
 
-        const trimmedSubject = subject.trim();
-        const trimmedDate = date.trim();
+        const userDept = department || req.user?.department || 'Computer Science & Engineering';
 
-        const upsertPromises = records.map((rec) => {
-            const isPresentBool = rec.status === 'present' || rec.isPresent === true;
-
-            return Attendance.findOneAndUpdate(
-                {
-                    $or: [
-                        { student: rec.studentId, subject: trimmedSubject, date: trimmedDate },
-                        { studentName: rec.name.trim(), subject: trimmedSubject, date: trimmedDate }
-                    ]
-                },
-                {
-                    student: rec.studentId || null,
-                    studentName: rec.name.trim(),
-                    rollNo: rec.rollNo || '',
-                    subject: trimmedSubject,
-                    date: trimmedDate,
-                    isPresent: isPresentBool,
-                    remarks: rec.remarks || ''
-                },
-                { upsert: true, new: true, setDefaultsOnInsert: true }
-            );
+        // Delete existing records for this subject and date to prevent duplicates
+        await Attendance.deleteMany({
+            date: date.trim(),
+            subject: subject.trim()
         });
 
-        await Promise.all(upsertPromises);
+        // Insert new attendance entries
+        const attendanceDocs = records.map((r) => ({
+            student: r.studentId || r.id,
+            studentName: r.name || r.studentName || 'Student',
+            subject: subject.trim(),
+            department: userDept,
+            date: date.trim(),
+            isPresent: r.isPresent === true || r.status === 'present',
+            remarks: r.remarks || '',
+            recordedBy: req.user ? req.user._id : null
+        }));
 
-        const presentCount = records.filter((r) => r.status === 'present' || r.isPresent === true).length;
-        const absentCount = records.length - presentCount;
+        if (attendanceDocs.length > 0) {
+            await Attendance.insertMany(attendanceDocs);
+        }
 
         res.status(200).json({
             success: true,
-            message: `Attendance Sheet for ${trimmedDate} saved! (${presentCount} Present, ${absentCount} Absent) ✅`,
-            presentCount,
-            absentCount,
-            total: records.length
+            message: `Attendance for ${subject} (${date}) saved successfully! 📊`,
+            count: attendanceDocs.length
         });
     } catch (error) {
         res.status(500).json({
@@ -284,42 +294,24 @@ exports.saveClassAttendanceSheet = async (req, res) => {
 };
 
 // ----------------------------------------------------
-// @desc    Get all recorded dates & months for calendar/history
+// @desc    Get all distinct dates for which attendance was recorded
 // @route   GET /api/attendance/recorded-dates
 // @access  Private
 // ----------------------------------------------------
 exports.getRecordedDates = async (req, res) => {
     try {
         const { subject } = req.query;
-        const query = subject ? { subject: subject.trim() } : {};
-        const records = await Attendance.find(query).select('date subject isPresent studentName');
+        const query = {};
+        if (subject && subject.trim() !== '') {
+            query.subject = subject.trim();
+        }
 
-        // Extract unique dates and group by date
-        const dateMap = {};
-        records.forEach((r) => {
-            if (!dateMap[r.date]) {
-                dateMap[r.date] = {
-                    date: r.date,
-                    subject: r.subject,
-                    total: 0,
-                    present: 0,
-                    absent: 0
-                };
-            }
-            dateMap[r.date].total += 1;
-            if (r.isPresent) {
-                dateMap[r.date].present += 1;
-            } else {
-                dateMap[r.date].absent += 1;
-            }
-        });
-
-        const datesList = Object.values(dateMap);
+        const dates = await Attendance.distinct('date', query);
 
         res.status(200).json({
             success: true,
-            count: datesList.length,
-            dates: datesList
+            count: dates.length,
+            dates
         });
     } catch (error) {
         res.status(500).json({
@@ -344,7 +336,7 @@ exports.getAttendance = async (req, res) => {
         const query = {
             $or: [
                 { student: req.user ? req.user._id : null },
-                { studentName: { $regex: new RegExp(studentName, 'i') } }
+                { studentName: { $regex: new RegExp(`^${studentName}$`, 'i') } }
             ]
         };
 

@@ -58,16 +58,12 @@ const submissionSchema = new mongoose.Schema(
         gradedAt: {
             type: Date
         },
-        gradedBy: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: 'User'
-        },
         gradedByName: {
             type: String,
             default: ''
         }
     },
-    { _id: true }
+    { _id: true, timestamps: true }
 );
 
 const assignmentSchema = new mongoose.Schema(
@@ -82,17 +78,33 @@ const assignmentSchema = new mongoose.Schema(
             required: [true, 'Subject is required'],
             trim: true
         },
+        department: {
+            type: String,
+            trim: true,
+            default: 'Computer Science & Engineering'
+        },
+        semester: {
+            type: String,
+            trim: true,
+            default: 'Semester 1'
+        },
+        batch: {
+            type: String,
+            trim: true,
+            default: '2024 - 2028'
+        },
         description: {
             type: String,
+            trim: true,
             default: ''
         },
         dueDate: {
-            type: String, // e.g. "Due: 20 Oct 2026"
-            required: true
+            type: String, // e.g. "Tomorrow, 11:59 PM" or "2026-10-05"
+            required: [true, 'Due date is required']
         },
         priority: {
             type: String,
-            enum: ['High Priority', 'Medium Priority', 'Low Priority'],
+            enum: ['High Priority', 'Medium Priority', 'Low Priority', 'High', 'Medium', 'Low'],
             default: 'Medium Priority'
         },
         maxScore: {
@@ -101,15 +113,13 @@ const assignmentSchema = new mongoose.Schema(
         },
         progress: {
             type: Number,
-            default: 0,
-            min: 0,
-            max: 100
+            default: 0
         },
-        submissions: [submissionSchema],
         createdBy: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'User'
-        }
+        },
+        submissions: [submissionSchema]
     },
     {
         timestamps: true

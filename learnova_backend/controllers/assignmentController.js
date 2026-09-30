@@ -2,16 +2,39 @@ const Assignment = require('../models/Assignment');
 const User = require('../models/User');
 
 // ----------------------------------------------------
-// @desc    Get all assignments (Role-aware)
+// @desc    Get all assignments (Role & Department aware)
 // @route   GET /api/assignments
 // @access  Private
 // ----------------------------------------------------
 exports.getAssignments = async (req, res) => {
     try {
         const user = req.user;
-        const assignments = await Assignment.find()
-            .populate('submissions.student', 'name email studentId profileImage')
-            .populate('createdBy', 'name email')
+        const userDept = user.department;
+
+        // Filter query strictly by department for students
+        let filterQuery = {};
+        if (user.role === 'student') {
+            if (userDept) {
+                filterQuery = { department: userDept };
+            } else {
+                filterQuery = {};
+            }
+        } else if (user.role === 'teacher') {
+            if (userDept) {
+                filterQuery = {
+                    $or: [
+                        { department: userDept },
+                        { createdBy: user._id }
+                    ]
+                };
+            } else {
+                filterQuery = { createdBy: user._id };
+            }
+        }
+
+        const assignments = await Assignment.find(filterQuery)
+            .populate('submissions.student', 'name email studentId profileImage department')
+            .populate('createdBy', 'name email department')
             .sort({ createdAt: -1 });
 
         // If Teacher or Admin: return full assignment details with all student submissions
@@ -44,6 +67,7 @@ exports.getAssignments = async (req, res) => {
                     id: a._id,
                     title: a.title,
                     subject: a.subject,
+                    department: a.department || userDept || 'General',
                     description: a.description || '',
                     dueDate: a.dueDate,
                     priority: a.priority,
@@ -66,19 +90,20 @@ exports.getAssignments = async (req, res) => {
 
         // Student View: map student-specific submission and results
         const studentFormatted = assignments.map((a) => {
-            const submission = a.submissions.find(
-                (s) => s.student && s.student._id.toString() === user._id.toString()
+            const submission = (a.submissions || []).find(
+                (s) => s.student && (s.student._id || s.student).toString() === user._id.toString()
             );
 
             return {
                 id: a._id,
                 title: a.title,
                 subject: a.subject,
+                department: a.department || userDept || 'General',
                 description: a.description || '',
                 dueDate: a.dueDate,
                 priority: a.priority,
                 maxScore: a.maxScore || 100,
-                progress: submission ? (submission.status === 'graded' ? 100 : 80) : a.progress,
+                progress: submission ? (submission.status === 'graded' ? 100 : 80) : 0,
                 status: submission ? submission.status : 'pending',
                 score: submission ? submission.score : null,
                 feedback: submission ? submission.feedback : '',
@@ -111,7 +136,7 @@ exports.getAssignments = async (req, res) => {
 // ----------------------------------------------------
 exports.createAssignment = async (req, res) => {
     try {
-        const { title, subject, description, dueDate, priority, maxScore } = req.body;
+        const { title, subject, department, semester, batch, description, dueDate, priority, maxScore } = req.body;
 
         if (!title || !subject || !dueDate) {
             return res.status(400).json({
@@ -123,6 +148,9 @@ exports.createAssignment = async (req, res) => {
         const assignment = await Assignment.create({
             title,
             subject,
+            department: department || req.user.department || 'Computer Science & Engineering',
+            semester: semester || req.user.semester || 'Semester 1',
+            batch: batch || req.user.batch || '2024 - 2028',
             description: description || '',
             dueDate,
             priority: priority || 'Medium Priority',
@@ -181,11 +209,10 @@ exports.submitAssignment = async (req, res) => {
                 studentEmail: req.user.email,
                 studentRollNo: req.user.studentId || '',
                 submittedAt: new Date(),
-                status: 'submitted',
                 fileName: fileName || '',
                 fileUrl: fileUrl || '',
                 submissionText: submissionText || '',
-                maxScore: assignment.maxScore || 100
+                status: 'submitted'
             });
         }
 
@@ -193,7 +220,10 @@ exports.submitAssignment = async (req, res) => {
 
         res.status(200).json({
             success: true,
-            message: 'Assignment submitted successfully! 🎉'
+            message: 'Assignment submitted successfully! 🚀',
+            submission: assignment.submissions.find(
+                (s) => s.student.toString() === req.user._id.toString()
+            )
         });
     } catch (error) {
         res.status(500).json({
@@ -205,23 +235,14 @@ exports.submitAssignment = async (req, res) => {
 };
 
 // ----------------------------------------------------
-// @desc    Grade student submission (Teacher/Admin)
-// @route   PUT /api/assignments/:id/submissions/:submissionId/grade
+// @desc    Grade a student submission (Teacher/Admin)
+// @route   PUT /api/assignments/:id/grade/:submissionId
 // @access  Private (Teacher, Admin)
 // ----------------------------------------------------
 exports.gradeSubmission = async (req, res) => {
     try {
-        const { id, submissionId } = req.params;
         const { score, feedback } = req.body;
-
-        if (score === undefined || score === null) {
-            return res.status(400).json({
-                success: false,
-                message: 'Please provide a grade score'
-            });
-        }
-
-        const assignment = await Assignment.findById(id);
+        const assignment = await Assignment.findById(req.params.id);
         if (!assignment) {
             return res.status(404).json({
                 success: false,
@@ -229,27 +250,26 @@ exports.gradeSubmission = async (req, res) => {
             });
         }
 
-        const submission = assignment.submissions.id(submissionId);
-        if (!submission) {
+        const sub = assignment.submissions.id(req.params.submissionId);
+        if (!sub) {
             return res.status(404).json({
                 success: false,
                 message: 'Submission not found'
             });
         }
 
-        submission.score = Number(score);
-        submission.feedback = feedback !== undefined ? feedback : '';
-        submission.status = 'graded';
-        submission.gradedAt = new Date();
-        submission.gradedBy = req.user._id;
-        submission.gradedByName = req.user.name;
+        sub.score = Number(score);
+        sub.feedback = feedback ? feedback.trim() : '';
+        sub.status = 'graded';
+        sub.gradedAt = new Date();
+        sub.gradedByName = req.user.name;
 
         await assignment.save();
 
         res.status(200).json({
             success: true,
-            message: `Graded successfully with ${score}/${assignment.maxScore || 100} points! 🌟`,
-            submission
+            message: `Marks awarded to ${sub.studentName || 'Student'}! 🌟`,
+            submission: sub
         });
     } catch (error) {
         res.status(500).json({
@@ -279,7 +299,7 @@ exports.deleteAssignment = async (req, res) => {
 
         res.status(200).json({
             success: true,
-            message: 'Assignment removed successfully 🗑️'
+            message: 'Assignment deleted successfully'
         });
     } catch (error) {
         res.status(500).json({

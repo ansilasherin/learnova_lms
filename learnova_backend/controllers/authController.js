@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const Student = require('../models/Student');
 const generateToken = require('../utils/generateToken');
 
 // ====================================================
@@ -8,7 +9,20 @@ const generateToken = require('../utils/generateToken');
 // ====================================================
 const registerUser = async (req, res) => {
     try {
-        const { name, email, phone, password, role, studentId } = req.body;
+        const {
+            name,
+            email,
+            phone,
+            password,
+            role,
+            department,
+            studentId,
+            semester,
+            batch,
+            designation,
+            facultyId,
+            bio
+        } = req.body;
 
         // 1. Check if required fields are provided
         if (!name || !email || !password) {
@@ -34,13 +48,40 @@ const registerUser = async (req, res) => {
             phone: phone || '',
             password,
             role: role || 'student',
-            studentId: studentId || null
+            department: department || 'Computer Science & Engineering',
+            studentId: studentId || null,
+            semester: semester || 'Semester 1',
+            batch: batch || '2024 - 2028',
+            designation: designation || 'Assistant Professor',
+            facultyId: facultyId || null,
+            bio: bio || ''
         });
 
-        // 4. Generate JWT token
+        // 4. Auto-sync student to class roster of their department
+        if (user.role === 'student') {
+            try {
+                await Student.findOneAndUpdate(
+                    { email: user.email },
+                    {
+                        name: user.name,
+                        rollNo: user.studentId || user.email.split('@')[0],
+                        email: user.email,
+                        department: user.department,
+                        semester: user.semester,
+                        batch: user.batch,
+                        user: user._id
+                    },
+                    { upsert: true, new: true }
+                );
+            } catch (err) {
+                console.error('Auto-roster sync error:', err.message);
+            }
+        }
+
+        // 5. Generate JWT token
         const token = generateToken(user._id, user.role);
 
-        // 5. Send success response (excluding password)
+        // 6. Send success response (excluding password)
         res.status(201).json({
             success: true,
             message: 'User registered successfully! 🎉',
@@ -51,7 +92,13 @@ const registerUser = async (req, res) => {
                 email: user.email,
                 phone: user.phone,
                 role: user.role,
+                department: user.department,
                 studentId: user.studentId,
+                semester: user.semester,
+                batch: user.batch,
+                designation: user.designation,
+                facultyId: user.facultyId,
+                bio: user.bio,
                 profileImage: user.profileImage,
                 createdAt: user.createdAt
             }
@@ -128,7 +175,13 @@ const loginUser = async (req, res) => {
                 email: user.email,
                 phone: user.phone,
                 role: user.role,
+                department: user.department || 'Computer Science & Engineering',
                 studentId: user.studentId,
+                semester: user.semester || 'Semester 1',
+                batch: user.batch || '2024 - 2028',
+                designation: user.designation || 'Assistant Professor',
+                facultyId: user.facultyId,
+                bio: user.bio || '',
                 profileImage: user.profileImage,
                 createdAt: user.createdAt
             }
@@ -151,7 +204,6 @@ const loginUser = async (req, res) => {
 // ====================================================
 const getMe = async (req, res) => {
     try {
-        // req.user is attached by the 'protect' middleware
         res.status(200).json({
             success: true,
             message: 'User profile fetched successfully! 👤',

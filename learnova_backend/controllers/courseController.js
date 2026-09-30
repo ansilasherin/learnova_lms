@@ -10,13 +10,17 @@ const fs = require('fs');
 // ====================================================
 const getAllCourses = async (req, res) => {
     try {
-        const { category, search, level } = req.query;
+        const { category, search, level, department } = req.query;
 
         // Build filter query
         let query = { isPublished: true };
 
         if (category) {
             query.category = { $regex: category, $options: 'i' };
+        }
+
+        if (department) {
+            query.department = { $regex: department, $options: 'i' };
         }
 
         if (level) {
@@ -32,7 +36,7 @@ const getAllCourses = async (req, res) => {
 
         // Fetch courses and populate instructor details (name, email, profileImage)
         const courses = await Course.find(query)
-            .populate('instructor', 'name email profileImage')
+            .populate('instructor', 'name email profileImage department designation')
             .sort({ createdAt: -1 });
 
         res.status(200).json({
@@ -59,7 +63,7 @@ const getAllCourses = async (req, res) => {
 const getCourseById = async (req, res) => {
     try {
         const course = await Course.findById(req.params.id)
-            .populate('instructor', 'name email profileImage role')
+            .populate('instructor', 'name email profileImage role department designation')
             .populate('enrolledStudents', 'name email');
 
         if (!course) {
@@ -90,7 +94,7 @@ const getCourseById = async (req, res) => {
 // ====================================================
 const createCourse = async (req, res) => {
     try {
-        const { title, description, category, price, level, thumbnail, lessons } = req.body;
+        const { title, description, category, department, semester, batch, price, level, thumbnail, lessons } = req.body;
 
         // 1. Validation
         if (!title || !description || !category) {
@@ -105,6 +109,9 @@ const createCourse = async (req, res) => {
             title,
             description,
             category,
+            department: department || req.user.department || 'Computer Science & Engineering',
+            semester: semester || req.user.semester || 'Semester 1',
+            batch: batch || req.user.batch || '2024 - 2028',
             price: price !== undefined ? price : 0,
             level: level || 'Beginner',
             thumbnail: thumbnail || undefined,
