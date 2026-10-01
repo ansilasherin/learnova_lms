@@ -15,12 +15,15 @@ const getAllCourses = async (req, res) => {
         // Build filter query
         let query = { isPublished: true };
 
-        if (category) {
-            query.category = { $regex: category, $options: 'i' };
+        const targetDept = department ? department.trim() : (req.user && req.user.department ? req.user.department.trim() : null);
+
+        if (targetDept) {
+            const escaped = targetDept.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            query.department = { $regex: new RegExp(`^${escaped}$`, 'i') };
         }
 
-        if (department) {
-            query.department = { $regex: department, $options: 'i' };
+        if (category) {
+            query.category = { $regex: category, $options: 'i' };
         }
 
         if (level) {
@@ -34,7 +37,7 @@ const getAllCourses = async (req, res) => {
             ];
         }
 
-        // Fetch courses and populate instructor details (name, email, profileImage)
+        // Fetch courses and populate instructor details
         const courses = await Course.find(query)
             .populate('instructor', 'name email profileImage department designation')
             .sort({ createdAt: -1 });
